@@ -171,12 +171,6 @@ See [aws/README.md](aws/README.md) for the full deployment guide.
 | `SECRET_KEY` | JWT signing secret |
 | `AWS_BUCKET_NAME` | S3 screenshots bucket name |
 
-## Resume Bullet Points
-
-- **Built a distributed URL analysis platform** with FastAPI, Next.js, and Kafka (Redpanda), achieving sub-50ms API response times through async event-driven architecture with Redis caching and SHA-256 URL deduplication.
-- **Designed a real-time data pipeline** where Kafka decouples URL submission from processing — workers analyze URLs (HTTP fetch, SSL validation, Playwright screenshots, tech stack detection) and results fan out via WebSocket broadcast to all connected clients.
-- **Implemented production infrastructure** with Docker Compose (5 services), Kubernetes manifests with HPA auto-scaling, GitHub Actions CI/CD (test → ECR push → EC2 deploy), and AWS provisioning scripts for S3, RDS, EC2, and ECR.
-- **Engineered a full-stack observability system** with PostgreSQL for analysis history, Redis sliding-window rate limiting (20 req/min per IP), health check endpoints monitoring all dependencies, and a Next.js dashboard with live WebSocket feed and glassmorphism UI.
 
 ## Project Structure
 
@@ -204,7 +198,3 @@ pulselink/
 ├── docker-compose.yml    # Full local stack
 └── .env.example          # Environment variables reference
 ```
-
-## License
-
-MIT
