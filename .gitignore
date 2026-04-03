@@ -1,5 +1,31 @@
-# Root gitignore
+# Node & Next.js
 node_modules/
-frontend/node_modules/
+.next/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Environment
 .env
+.env.*
+!.env.example
+
+# AWS / Cloud Deploy Scripts
+aws/
+
+# IDE & OS
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Custom / Temp files
+test_ws.py
+logs/
