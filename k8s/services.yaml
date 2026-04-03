@@ -1,0 +1,50 @@
+# Consolidated Services file
+# Note: api-service and frontend Services are already defined
+# in their respective deployment files. This file contains
+# any additional services needed.
+
+# If using an Ingress controller instead of LoadBalancer,
+# you could define an Ingress resource here:
+#
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: pulselink-ingress
+# spec:
+#   rules:
+#     - host: pulselink.local
+#       http:
+#         paths:
+#           - path: /api
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: api-service
+#                 port:
+#                   number: 8000
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: frontend
+#                 port:
+#                   number: 80
+
+---
+# Secret template (values should be base64 encoded)
+# Create this with:
+#   kubectl create secret generic pulselink-secrets \
+#     --from-literal=DATABASE_URL='postgresql://...' \
+#     --from-literal=SECRET_KEY='your-secret-key' \
+#     --from-literal=AWS_BUCKET_NAME='pulselink-screenshots'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pulselink-secrets
+  labels:
+    app: pulselink
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://pulselink:pulselink123@postgres:5432/pulselink"
+  SECRET_KEY: "change-this-in-production"
+  AWS_BUCKET_NAME: "pulselink-screenshots"

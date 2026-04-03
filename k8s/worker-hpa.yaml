@@ -1,0 +1,47 @@
+# HorizontalPodAutoscaler for the worker-service.
+#
+# NOTE: In production, this would ideally use Kafka consumer lag as the
+# custom metric via KEDA (Kubernetes Event-Driven Autoscaler). KEDA can
+# scale based on the number of pending messages in the "url.submitted"
+# topic, which directly reflects actual workload demand.
+#
+# CPU-based scaling is used here for simplicity, since KEDA requires
+# additional setup (CRDs, ScaledObject resources, etc).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-hpa
+  labels:
+    app: pulselink
+    component: worker
+  annotations:
+    description: >
+      In production this would use Kafka consumer lag as the custom metric
+      via KEDA — CPU is used here for simplicity.
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker-service
+  minReplicas: 1
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulselink-config
+  labels:
+    app: pulselink
+data:
+  KAFKA_BROKERS: "redpanda:29092"
+  REDIS_URL: "redis://redis:6379/0"
+  ENVIRONMENT: "production"
+  NEXT_PUBLIC_API_URL: "http://api-service:8000"
+  AWS_BUCKET_NAME: "pulselink-screenshots"
+  AWS_REGION: "us-east-1"
