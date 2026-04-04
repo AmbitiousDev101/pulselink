@@ -171,7 +171,6 @@ See [aws/README.md](aws/README.md) for the full deployment guide.
 | `SECRET_KEY` | JWT signing secret |
 | `AWS_BUCKET_NAME` | S3 screenshots bucket name |
 
-
 ## Project Structure
 
 ```
