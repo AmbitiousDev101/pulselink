@@ -2,7 +2,7 @@
 
 LIVE : http://pulselink.mooo.com
 
-PulseLink is a distributed, real-time URL analysis platform built to demonstrate production-grade systems design. Paste any URL and get an instant, comprehensive analysis, page title, response time, SSL certificate status, redirect chain, detected tech stack, safety score, and a live screenshot. Every analysis appears on a public live feed that updates in real time via WebSockets for all connected users.
+PulseLink is a distributed, real-time URL analysis platform. Paste any URL and get an instant, comprehensive analysis, page title, response time, SSL certificate status, redirect chain, detected tech stack, safety score, and a live screenshot. Every analysis appears on a public live feed that updates in real time via WebSockets for all connected users.
 
 Under the hood, PulseLink uses an async event-driven architecture: the API gateway publishes submissions to Kafka (Redpanda) for non-blocking ingestion, a worker service consumes and analyzes URLs, and results fan out to all connected clients through WebSocket broadcast. The result is an API that responds in under 50ms regardless of how long the actual analysis takes.
 
@@ -137,16 +137,7 @@ chmod +x aws/*.sh
 
 See [aws/README.md](aws/README.md) for the full deployment guide.
 
-## How to Demo It
 
-1. **Start the stack**: `docker compose up -d`
-2. **Open the frontend**: http://localhost:3000
-3. **Click "Simulate Live Traffic"** — the live feed populates with realistic analyses
-4. **Paste a real URL** (e.g., `https://github.com`) — watch it appear in the feed when done
-5. **Click any result** — see the full analysis: status code, response time, SSL, tech stack, redirects
-6. **Open a second browser tab** — both tabs update simultaneously via WebSocket
-7. **Show the API docs** at http://localhost:8000/docs — full OpenAPI spec
-8. **Show the architecture**: `docker compose ps` — 5 services, all healthy
 
 ## API Endpoints
 
