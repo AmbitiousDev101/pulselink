@@ -25,15 +25,18 @@ def mock_dependencies():
          patch("services.cache.is_redis_healthy", new_callable=AsyncMock, return_value=True), \
          patch("services.cache.close_redis", new_callable=AsyncMock):
 
-        # Mock the database pool and connection
-        mock_conn_ctx = AsyncMock()
+        # Prepare the connection object
         mock_conn_obj = AsyncMock()
+
+        # Prepare the context manager that yields the connection
+        mock_conn_ctx = MagicMock()
         mock_conn_ctx.__aenter__ = AsyncMock(return_value=mock_conn_obj)
         mock_conn_ctx.__aexit__ = AsyncMock(return_value=False)
 
+        # Prepare the pool which has .acquire()
         mock_pool_obj = AsyncMock()
-        from unittest.mock import MagicMock
         mock_pool_obj.acquire = MagicMock(return_value=mock_conn_ctx)
+        
         mock_get_pool.return_value = mock_pool_obj
 
         # Mock WebSocket manager
@@ -83,7 +86,7 @@ async def test_health_endpoint(client, mock_dependencies):
 async def test_submit_url(client, mock_dependencies):
     """POST /api/v1/urls should accept a URL and return 202."""
     import uuid
-    mock_row = {"id": uuid.uuid4()}
+    mock_row = {"id": uuid.uuid4(), "status": "processing"}
 
     mock_dependencies["conn"].fetchrow = AsyncMock(
         side_effect=[None, mock_row]  # First call: no existing, Second: insert returns id
