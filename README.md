@@ -5,7 +5,7 @@ PulseLink is a distributed, real-time URL analysis platform built to demonstrate
 Under the hood, PulseLink uses an async event-driven architecture: the API gateway publishes submissions to Kafka (Redpanda) for non-blocking ingestion, a worker service consumes and analyzes URLs, and results fan out to all connected clients through WebSocket broadcast. The result is an API that responds in under 50ms regardless of how long the actual analysis takes.
 
 ## Architecture
-
+ 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          PULSELINK                                  │
