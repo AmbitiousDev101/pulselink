@@ -1,6 +1,8 @@
 # PulseLink — Real-Time URL Analysis Platform
 
-PulseLink is a distributed, real-time URL analysis platform built to demonstrate production-grade systems design. Paste any URL and get an instant, comprehensive analysis — page title, response time, SSL certificate status, redirect chain, detected tech stack, safety score, and a live screenshot. Every analysis appears on a public live feed that updates in real time via WebSockets for all connected users.
+LIVE : http://pulselink.mooo.com
+
+PulseLink is a distributed, real-time URL analysis platform built to demonstrate production-grade systems design. Paste any URL and get an instant, comprehensive analysis, page title, response time, SSL certificate status, redirect chain, detected tech stack, safety score, and a live screenshot. Every analysis appears on a public live feed that updates in real time via WebSockets for all connected users.
 
 Under the hood, PulseLink uses an async event-driven architecture: the API gateway publishes submissions to Kafka (Redpanda) for non-blocking ingestion, a worker service consumes and analyzes URLs, and results fan out to all connected clients through WebSocket broadcast. The result is an API that responds in under 50ms regardless of how long the actual analysis takes.
 
