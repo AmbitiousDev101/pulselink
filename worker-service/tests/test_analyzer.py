@@ -1,6 +1,6 @@
 """Tests for PulseLink worker-service URL analyzer."""
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 @pytest.fixture(autouse=True)
 def mock_s3():
-    """Mock S3 upload for all tests."""
     with patch(
         "s3_upload.upload_screenshot",
         new_callable=AsyncMock,
@@ -22,10 +21,31 @@ def anyio_backend():
     return "asyncio"
 
 
+def make_playwright_mock():
+    mock_page = AsyncMock()
+    mock_page.screenshot = AsyncMock(return_value=b"fake-png-data")
+    mock_page.goto = AsyncMock()
+
+    mock_browser = AsyncMock()
+    mock_browser.new_page = AsyncMock(return_value=mock_page)
+    mock_browser.close = AsyncMock()
+
+    mock_p = AsyncMock()
+    mock_p.chromium.launch = AsyncMock(return_value=mock_browser)
+
+    mock_ctx = AsyncMock()
+    mock_ctx.__aenter__ = AsyncMock(return_value=mock_p)
+    mock_ctx.__aexit__ = AsyncMock(return_value=False)
+
+    mock_async_playwright = MagicMock(return_value=mock_ctx)
+    return mock_async_playwright
+
+
 @pytest.mark.anyio
 async def test_analyze_known_safe_url():
-    """Test analyzing a known safe URL returns expected fields."""
-    with patch("httpx.AsyncClient") as MockClient:
+    with patch("httpx.AsyncClient") as MockClient, \
+         patch("playwright.async_api.async_playwright", make_playwright_mock()):
+
         mock_response = AsyncMock()
         mock_response.status_code = 200
         mock_response.text = """
@@ -37,10 +57,7 @@ async def test_analyze_known_safe_url():
         <body><h1>Example</h1></body>
         </html>
         """
-        mock_response.headers = {
-            "server": "nginx",
-            "content-type": "text/html",
-        }
+        mock_response.headers = {"server": "nginx", "content-type": "text/html"}
         mock_response.history = []
 
         mock_client_instance = AsyncMock()
@@ -49,39 +66,28 @@ async def test_analyze_known_safe_url():
         mock_client_instance.__aexit__ = AsyncMock(return_value=False)
         MockClient.return_value = mock_client_instance
 
-        with patch("analyzer.async_playwright") as mock_pw:
-            mock_browser = AsyncMock()
-            mock_page = AsyncMock()
-            mock_page.screenshot = AsyncMock(return_value=b"fake-png-data")
-            mock_browser.new_page = AsyncMock(return_value=mock_page)
-            mock_pw_instance = AsyncMock()
-            mock_pw_instance.chromium.launch = AsyncMock(return_value=mock_browser)
-            mock_pw_ctx = AsyncMock()
-            mock_pw_ctx.__aenter__ = AsyncMock(return_value=mock_pw_instance)
-            mock_pw_ctx.__aexit__ = AsyncMock(return_value=False)
-            mock_pw.return_value = mock_pw_ctx
+        from analyzer import analyze_url
+        result = await analyze_url("https://example.com")
 
-            from analyzer import analyze_url
-            result = await analyze_url("https://example.com")
-
-            assert result["url"] == "https://example.com"
-            assert "title" in result
-            assert "status_code" in result
-            assert "response_time_ms" in result
-            assert "redirect_chain" in result
-            assert isinstance(result["redirect_chain"], list)
-            assert "ssl_valid" in result
-            assert "tech_stack" in result
-            assert "safety_score" in result
-            assert result["safety_score"] in ("safe", "suspicious", "dangerous")
-            assert "screenshot_url" in result
-            assert "analyzed_at" in result
+        assert result["url"] == "https://example.com"
+        assert "title" in result
+        assert "status_code" in result
+        assert "response_time_ms" in result
+        assert "redirect_chain" in result
+        assert isinstance(result["redirect_chain"], list)
+        assert "ssl_valid" in result
+        assert "tech_stack" in result
+        assert "safety_score" in result
+        assert result["safety_score"] in ("safe", "suspicious", "dangerous")
+        assert "screenshot_url" in result
+        assert "analyzed_at" in result
 
 
 @pytest.mark.anyio
 async def test_analyze_suspicious_url():
-    """Test that HTTP URLs are marked as suspicious."""
-    with patch("httpx.AsyncClient") as MockClient:
+    with patch("httpx.AsyncClient") as MockClient, \
+         patch("playwright.async_api.async_playwright", make_playwright_mock()):
+
         mock_response = AsyncMock()
         mock_response.status_code = 200
         mock_response.text = "<html><head><title>Test</title></head><body></body></html>"
@@ -94,21 +100,16 @@ async def test_analyze_suspicious_url():
         mock_client_instance.__aexit__ = AsyncMock(return_value=False)
         MockClient.return_value = mock_client_instance
 
-        with patch("analyzer.async_playwright") as mock_pw:
-            mock_pw_ctx = AsyncMock()
-            mock_pw_ctx.__aenter__ = AsyncMock(side_effect=Exception("No browser"))
-            mock_pw_ctx.__aexit__ = AsyncMock(return_value=False)
-            mock_pw.return_value = mock_pw_ctx
-
-            from analyzer import analyze_url
-            result = await analyze_url("http://example.com")
-            assert result["safety_score"] == "suspicious"
+        from analyzer import analyze_url
+        result = await analyze_url("http://example.com")
+        assert result["safety_score"] == "suspicious"
 
 
 @pytest.mark.anyio
 async def test_analyze_returns_tech_stack():
-    """Test that tech stack detection works for known patterns."""
-    with patch("httpx.AsyncClient") as MockClient:
+    with patch("httpx.AsyncClient") as MockClient, \
+         patch("playwright.async_api.async_playwright", make_playwright_mock()):
+
         mock_response = AsyncMock()
         mock_response.status_code = 200
         mock_response.text = """
@@ -128,14 +129,8 @@ async def test_analyze_returns_tech_stack():
         mock_client_instance.__aexit__ = AsyncMock(return_value=False)
         MockClient.return_value = mock_client_instance
 
-        with patch("analyzer.async_playwright") as mock_pw:
-            mock_pw_ctx = AsyncMock()
-            mock_pw_ctx.__aenter__ = AsyncMock(side_effect=Exception("No browser"))
-            mock_pw_ctx.__aexit__ = AsyncMock(return_value=False)
-            mock_pw.return_value = mock_pw_ctx
-
-            from analyzer import analyze_url
-            result = await analyze_url("https://wordpress-site.example.com")
-            assert "Server: Apache" in result["tech_stack"]
-            assert "X-Powered-By: PHP/8.1" in result["tech_stack"]
-            assert "WordPress" in result["tech_stack"]
+        from analyzer import analyze_url
+        result = await analyze_url("https://wordpress-site.example.com")
+        assert "Server: Apache" in result["tech_stack"]
+        assert "X-Powered-By: PHP/8.1" in result["tech_stack"]
+        assert "WordPress" in result["tech_stack"]
