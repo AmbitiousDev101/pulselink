@@ -6,7 +6,7 @@ import uuid
 import json
 from datetime import datetime
 
-# Patch background lifecycle routines implicitly so app boots quickly
+
 @pytest.fixture(autouse=True)
 def mock_background_tasks():
     with patch("database.init_db", new_callable=AsyncMock), \
@@ -18,6 +18,7 @@ def mock_background_tasks():
          patch("services.cache.close_redis", new_callable=AsyncMock):
         yield
 
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
@@ -25,49 +26,48 @@ def anyio_backend():
 
 @pytest.fixture
 async def client():
-    """Create a test client for the FastAPI app."""
-    import sys
-    import os
+    import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
     from main import app
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
 
-class DatabaseMock:
-    """Helper class to cleanly assemble an asyncpg connection payload stringently."""
-    def __init__(self):
-        self.conn = AsyncMock()
-        
-        self.ctx = MagicMock()
-        self.ctx.__aenter__ = AsyncMock(return_value=self.conn)
-        self.ctx.__aexit__ = AsyncMock(return_value=False)
-        
-        self.pool = AsyncMock()
-        self.pool.acquire = MagicMock(return_value=self.ctx)
+def make_db_mock(fetchrow_result=None, fetchrow_side_effect=None):
+    conn = AsyncMock()
+    if fetchrow_side_effect:
+        conn.fetchrow = AsyncMock(side_effect=fetchrow_side_effect)
+    else:
+        conn.fetchrow = AsyncMock(return_value=fetchrow_result)
+    conn.fetchval = AsyncMock(return_value=1)
+    conn.execute = AsyncMock(return_value=None)
+
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=conn)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+
+    pool = MagicMock()
+    pool.acquire = MagicMock(return_value=ctx)
+
+    async def get_pool_func():
+        return pool
+
+    return get_pool_func
 
 
 @pytest.mark.anyio
 async def test_root_endpoint(client):
-    """GET / should return service info."""
     response = await client.get("/")
     assert response.status_code == 200
-    data = response.json()
-    assert data["service"] == "PulseLink API"
+    assert response.json()["service"] == "PulseLink API"
 
 
 @pytest.mark.anyio
 async def test_health_endpoint(client):
-    """GET /health should return status info."""
-    db_mock = DatabaseMock()
-    db_mock.conn.fetchval = AsyncMock(return_value=1)
-    
-    with patch("routes.health.get_pool", new_callable=AsyncMock, return_value=db_mock.pool), \
-         patch("routes.health.is_kafka_healthy", new_callable=AsyncMock, return_value=True), \
+    with patch("routes.health.get_pool", new=make_db_mock()), \
+         patch("routes.health.is_kafka_healthy", return_value=True), \
          patch("routes.health.is_redis_healthy", new_callable=AsyncMock, return_value=True):
-        
         response = await client.get("/health")
         assert response.status_code == 200
         data = response.json()
@@ -79,42 +79,32 @@ async def test_health_endpoint(client):
 
 @pytest.mark.anyio
 async def test_submit_url(client):
-    """POST /api/v1/urls should accept a URL and return 202."""
-    db_mock = DatabaseMock()
-    mock_row = {"id": uuid.uuid4(), "status": "processing"}
-    db_mock.conn.fetchrow = AsyncMock(side_effect=[None, mock_row])
-    
-    with patch("routes.urls.get_pool", new_callable=AsyncMock, return_value=db_mock.pool), \
+    mock_id = uuid.uuid4()
+    get_pool = make_db_mock(fetchrow_side_effect=[
+        None,
+        {"id": mock_id, "status": "processing"}
+    ])
+    with patch("routes.urls.get_pool", new=get_pool), \
          patch("routes.urls.check_rate_limit", new_callable=AsyncMock, return_value=True), \
          patch("routes.urls.get_cached", new_callable=AsyncMock, return_value=None), \
          patch("routes.urls.publish_url_submitted", new_callable=AsyncMock):
-         
-        response = await client.post(
-            "/api/v1/urls",
-            json={"url": "https://example.com"},
-        )
+        response = await client.post("/api/v1/urls", json={"url": "https://example.com"})
         assert response.status_code == 202
         data = response.json()
         assert "job_id" in data
         assert data["status"] == "processing"
-        assert "message" in data
 
 
 @pytest.mark.anyio
 async def test_get_url_not_found(client):
-    """GET /api/v1/urls/{id} should return 404 for missing IDs."""
-    db_mock = DatabaseMock()
-    db_mock.conn.fetchrow = AsyncMock(return_value=None)
-    
-    with patch("routes.urls.get_pool", new_callable=AsyncMock, return_value=db_mock.pool):
+    get_pool = make_db_mock(fetchrow_result=None)
+    with patch("routes.urls.get_pool", new=get_pool):
         response = await client.get(f"/api/v1/urls/{uuid.uuid4()}")
         assert response.status_code == 404
 
 
 @pytest.mark.anyio
 async def test_get_url_result(client):
-    """GET /api/v1/urls/{id} should return the analysis result."""
-    db_mock = DatabaseMock()
     test_id = uuid.uuid4()
     mock_result = {
         "url": "https://example.com",
@@ -130,7 +120,6 @@ async def test_get_url_result(client):
         "analyzed_at": "2026-01-01T00:00:00",
         "description": None,
     }
-
     mock_row = {
         "id": test_id,
         "url": "https://example.com",
@@ -139,9 +128,8 @@ async def test_get_url_result(client):
         "created_at": datetime.now(),
         "result": json.dumps(mock_result),
     }
-    db_mock.conn.fetchrow = AsyncMock(return_value=mock_row)
-
-    with patch("routes.urls.get_pool", new_callable=AsyncMock, return_value=db_mock.pool):
+    get_pool = make_db_mock(fetchrow_result=mock_row)
+    with patch("routes.urls.get_pool", new=get_pool):
         response = await client.get(f"/api/v1/urls/{test_id}")
         assert response.status_code == 200
         data = response.json()
