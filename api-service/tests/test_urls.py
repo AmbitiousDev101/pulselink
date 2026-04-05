@@ -32,7 +32,8 @@ def mock_dependencies():
         mock_conn_ctx.__aexit__ = AsyncMock(return_value=False)
 
         mock_pool_obj = AsyncMock()
-        mock_pool_obj.acquire.return_value = mock_conn_ctx
+        from unittest.mock import MagicMock
+        mock_pool_obj.acquire = MagicMock(return_value=mock_conn_ctx)
         mock_get_pool.return_value = mock_pool_obj
 
         # Mock WebSocket manager
