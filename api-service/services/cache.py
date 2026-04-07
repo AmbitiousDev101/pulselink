@@ -55,22 +55,41 @@ async def set_cached(url_hash: str, result: dict, ttl: int = 3600):
 
 async def check_rate_limit(ip: str, limit: int = 20, window: int = 60) -> bool:
     """
-    Sliding window rate limiter using Redis INCR.
+    Sliding window rate limiter using Redis Sorted Sets (ZSET).
     Returns True if the request is allowed, False if rate limited.
     """
+    import time
     client = await get_redis()
     key = f"ratelimit:{ip}"
+    now = time.time()
+    
     try:
-        current = await client.incr(key)
-        if current == 1:
-            await client.expire(key, window)
-        if current > limit:
-            logger.warning(f"Rate limit exceeded for {ip}: {current}/{limit}")
+        pipe = client.pipeline()
+        # Remove timestamps older than the window
+        pipe.zremrangebyscore(key, 0, now - window)
+        # Add current timestamp (random suffix to avoid collisions if multiple requests at same exact float time)
+        import random
+        timestamp_key = f"{now}:{random.random()}"
+        pipe.zadd(key, {timestamp_key: now})
+        # Count remaining timestamps
+        pipe.zcard(key)
+        # Set expiry for cleanup
+        pipe.expire(key, window)
+        
+        results = await pipe.execute()
+        count = results[2] # result of zcard
+        
+        if count > limit:
+            logger.warning(f"Sliding window rate limit exceeded for {ip}: {count}/{limit}")
             return False
         return True
     except Exception as e:
         logger.error(f"Rate limit check error: {e}")
+        # Log stack trace if needed
+        import traceback
+        logger.error(traceback.format_exc())
         return True  # fail open
+
 
 
 async def is_redis_healthy() -> bool:

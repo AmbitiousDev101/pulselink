@@ -96,13 +96,26 @@ async def run_consumer():
                     )
                 logger.info(f"Job {job_id} completed and saved to DB")
 
-                # Publish to url.analyzed for WebSocket broadcast
-                from datetime import datetime, timezone
+                # Populate Redis cache for true <5ms repeated request latency
+                from services.cache import set_cached
                 import hashlib
+                from datetime import datetime, timezone
+                
+                url_hash = hashlib.sha256(url.strip().lower().rstrip("/").encode()).hexdigest()
+                await set_cached(url_hash, {
+                    "id": str(job_id),
+                    "url": url,
+                    "url_hash": url_hash,
+                    "status": "completed",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "result": result,
+                })
+
+                # Publish to url.analyzed for WebSocket broadcast
                 broadcast_msg = {
                     "id": str(job_id),
                     "url": url,
-                    "url_hash": hashlib.sha256(url.strip().lower().rstrip("/").encode()).hexdigest(),
+                    "url_hash": url_hash,
                     "status": "completed",
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "result": result,
@@ -112,6 +125,8 @@ async def run_consumer():
                     key=job_id,
                     value=broadcast_msg,
                 )
+
+
                 logger.info(f"Job {job_id} result published to url.analyzed")
 
             except Exception as e:
